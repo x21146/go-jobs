@@ -2,7 +2,6 @@ package jobs
 
 import (
 	"context"
-	"time"
 )
 
 type jobWorker struct {
@@ -22,8 +21,8 @@ func newJobWorker(ctx context.Context, count int) *jobWorker {
 					return
 				case j := <-ch:
 					j()
-				case <-time.After(1 * time.Second):
-					continue
+					//case <-time.After(1 * time.Second):
+					//	continue
 				}
 			}
 		}(handler.ch)
