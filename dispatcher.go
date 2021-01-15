@@ -4,22 +4,22 @@ import (
 	"context"
 )
 
-type jobDispatcher struct {
+type JobDispatcher struct {
 	ch       chan JobFunc
 	handlers []*jobWorker
 	queue    chan *jobWorker
 }
 
-func NewDefaultJobDispatcher() *jobDispatcher {
+func NewDefaultJobDispatcher() *JobDispatcher {
 	return NewDefaultJobDispatcherContext(context.Background())
 }
 
-func NewDefaultJobDispatcherContext(ctx context.Context) *jobDispatcher {
+func NewDefaultJobDispatcherContext(ctx context.Context) *JobDispatcher {
 	return NewJobDispatcher(ctx, 10, 10)
 }
 
-func NewJobDispatcher(ctx context.Context, count, subCount int) *jobDispatcher {
-	dispatcher := &jobDispatcher{
+func NewJobDispatcher(ctx context.Context, count, subCount int) *JobDispatcher {
+	dispatcher := &JobDispatcher{
 		ch:       make(chan JobFunc, count*100),
 		handlers: make([]*jobWorker, count),
 		queue:    make(chan *jobWorker, count),
@@ -37,7 +37,7 @@ func NewJobDispatcher(ctx context.Context, count, subCount int) *jobDispatcher {
 	return dispatcher
 }
 
-func (d *jobDispatcher) handle(ctx context.Context) {
+func (d *JobDispatcher) handle(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -53,10 +53,10 @@ func (d *jobDispatcher) handle(ctx context.Context) {
 	}
 }
 
-func (d *jobDispatcher) AddJob(job Job) {
+func (d *JobDispatcher) AddJob(job Job) {
 	d.ch <- job.Exec
 }
 
-func (d *jobDispatcher) AddFunc(f func()) {
+func (d *JobDispatcher) AddFunc(f func()) {
 	d.ch <- f
 }
