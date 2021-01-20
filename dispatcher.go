@@ -2,12 +2,11 @@ package jobs
 
 import (
 	"context"
+	"fmt"
 )
 
 type JobDispatcher struct {
-	ch       chan JobFunc
-	handlers []*jobWorker
-	queue    chan *jobWorker
+	ch       chan<- JobFunc
 }
 
 func NewDefaultJobDispatcher() *JobDispatcher {
@@ -19,36 +18,34 @@ func NewDefaultJobDispatcherContext(ctx context.Context) *JobDispatcher {
 }
 
 func NewJobDispatcher(ctx context.Context, count, subCount int) *JobDispatcher {
-	dispatcher := &JobDispatcher{
-		ch:       make(chan JobFunc, count*100),
-		handlers: make([]*jobWorker, count),
-		queue:    make(chan *jobWorker, count),
-	}
+	ch := make(chan JobFunc, count*100)
+	queue := make(chan *jobWorker, count)
 
-	for i := range dispatcher.handlers {
-		dispatcher.handlers[i] = newJobWorker(ctx, subCount)
-		dispatcher.queue <- dispatcher.handlers[i]
+	dispatcher := &JobDispatcher{
+		ch:       ch,
 	}
 
 	for i := 0; i < count; i++ {
-		go dispatcher.handle(ctx)
+		queue <- newJobWorker(ctx, subCount)
+		dn := fmt.Sprintf("dispatcher-%d", i)
+		go handle(context.WithValue(ctx, "name", dn), ch, queue)
 	}
 
 	return dispatcher
 }
 
-func (d *JobDispatcher) handle(ctx context.Context) {
+func handle(ctx context.Context, ch <-chan JobFunc, queue chan *jobWorker) {
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case j := <-d.ch:
-			h := <-d.queue
+		case j := <-ch:
+			h := <-queue
 			for !h.add(j) {
-				d.queue <- h
-				h = <-d.queue
+				queue <- h
+				h = <-queue
 			}
-			d.queue <- h
+			queue <- h
 		}
 	}
 }

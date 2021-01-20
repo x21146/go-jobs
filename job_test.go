@@ -11,7 +11,9 @@ import (
 func TestJobDispatcher(t *testing.T) {
 	count := 10000000
 	wg := sync.WaitGroup{}
-	c := make(chan bool)
+	wg.Add(count)
+
+	c := make(chan struct{})
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	dispatcher := NewDefaultJobDispatcherContext(ctx)
 
@@ -19,7 +21,6 @@ func TestJobDispatcher(t *testing.T) {
 
 	// add goroutine
 	go func() {
-		wg.Add(count)
 		for i := 0; i < count; i++ {
 			dispatcher.AddFunc(func() {
 				atomic.AddInt32(&counter, 1)
@@ -31,17 +32,15 @@ func TestJobDispatcher(t *testing.T) {
 	// wait group goroutine
 	go func() {
 		wg.Wait()
-		c <- true
+		close(c)
 	}()
 
 	select {
 	case <-time.After(1 * time.Second):
-		cancel()
-		break
 	case <-c:
-		break
 	}
 
+	cancel()
 	t.Log(counter)
 }
 

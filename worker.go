@@ -2,33 +2,44 @@ package jobs
 
 import (
 	"context"
+	"fmt"
+	"sync/atomic"
 )
 
 type jobWorker struct {
-	ch chan JobFunc
+	ch chan<- JobFunc
 }
 
+var id int64 = 0
+
 func newJobWorker(ctx context.Context, count int) *jobWorker {
+	n := atomic.AddInt64(&id, 1)
+	name := fmt.Sprintf("worker-%d", n)
+	ct := context.WithValue(ctx, "name", name)
+	ch := make(chan JobFunc, count*100)
+
 	handler := &jobWorker{
-		ch: make(chan JobFunc, count*100),
+		ch: ch,
 	}
 
 	for i := 0; i < count; i++ {
-		go func(ch chan JobFunc) {
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case j := <-ch:
-					j()
-					//case <-time.After(1 * time.Second):
-					//	continue
-				}
-			}
-		}(handler.ch)
+		wn := fmt.Sprintf("worker-%d-%d", n, i)
+		c := context.WithValue(ct, "name", wn)
+		go doWork(c, ch)
 	}
 
 	return handler
+}
+
+func doWork(ctx context.Context, ch <-chan JobFunc) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case j := <-ch:
+			j()
+		}
+	}
 }
 
 func (h *jobWorker) size() int {
